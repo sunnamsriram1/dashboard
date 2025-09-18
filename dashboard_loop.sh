@@ -84,7 +84,7 @@ dashboard_loop() {
             tor_status_text="${RED}TOR OFF${RESET}"
         fi
 
-        [[ $(curl -s --head --max-time 3 https://google.com >/dev/null 2>&1; echo $?) -eq 0 ]] && internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}" || internet_status="${BOLDRED}📴 Internet: OFFLINE ${RESET}"
+        [[ $(curl -s --head --max-time 3 https://google.com >/dev/null 2>&1; echo $?) -eq 0 ]] && internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}" || internet_status="${BOLDRED}📴 Internet: OFFLINE DACTIVATED${RESET}"
 
         now=$(date "+%Y-%m-%d | %I:%M:%S %p")
         printf "\n\n\n"

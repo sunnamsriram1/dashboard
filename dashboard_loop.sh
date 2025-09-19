@@ -1,7 +1,8 @@
 
 #!/data/data/com.termux/files/usr/bin/env bash
-# dashboard_loop_final_ascii.sh
+# dashboard_loop_fastfetch.sh
 # Termux dashboard with random ASCII separator + color (safe)
+# Uses fastfetch instead of neofetch
 
 export LANG=en_US.UTF-8
 TOR_SOCKS_PORT=9050
@@ -24,11 +25,25 @@ COLORS=("$RED" "$GREEN" "$YELLOW" "$CYAN" "$MAGENTA" "$BLUE" "$WHITE")
 LINE_CHARS=("-" "=" "*" "#" "+" "." "~")
 
 HAS_PV=0
-HAS_NEOfETCH=0
+HAS_FASTFETCH=0
 HAS_JQ=0
 command -v pv >/dev/null 2>&1 && HAS_PV=1
-command -v neofetch >/dev/null 2>&1 && HAS_NEOfETCH=1
+command -v fastfetch >/dev/null 2>&1 && HAS_FASTFETCH=1
 command -v jq >/dev/null 2>&1 && HAS_JQ=1
+
+# Auto install fastfetch if not installed
+if [[ $HAS_FASTFETCH -eq 0 ]]; then
+    echo -e "${BOLDGREEN}Fastfetch not found! Installing...${RESET}"
+    pkg install fastfetch -y >/dev/null 2>&1
+    command -v fastfetch >/dev/null 2>&1 && HAS_FASTFETCH=1
+    if [[ $HAS_FASTFETCH -eq 1 ]]; then
+        echo -e "${BOLDGREEN}Fastfetch installed successfully!${RESET}"
+        sleep 1
+    else
+        echo -e "${BOLDRED}Failed to install Fastfetch. Exiting.${RESET}"
+        exit 1
+    fi
+fi
 
 curl_safe() { curl -s --max-time 6 "$@" || echo ""; }
 tor_curl() { curl -s --socks5-hostname "127.0.0.1:$TOR_SOCKS_PORT" --max-time 8 "$@" || echo ""; }
@@ -48,16 +63,31 @@ print_line() {
     printf "%b%${width}s%b\n" "$color" "" "$RESET" | tr ' ' "$char"
 }
 
-print_neofetch_slow() {
-    if [[ $HAS_NEOfETCH -eq 1 ]]; then
-        if neofetch --help 2>&1 | grep -q -- "--disable"; then
-            [[ $HAS_PV -eq 1 ]] && neofetch --off --disable memory cpu gpu 2>/dev/null | pv -qL 60 || neofetch --off --disable memory cpu gpu 2>/dev/null
-        else
-            [[ $HAS_PV -eq 1 ]] && neofetch --off 2>/dev/null | pv -qL 60 || neofetch --off 2>/dev/null
-        fi
+print_fastfetch_slow() {
+    if [[ $HAS_FASTFETCH -eq 1 ]]; then
+        ff_output=$(fastfetch 2>/dev/null)
+
+        GREEN_FIELDS=("OS:" "Host:" "Kernel:" "Uptime:" "Packages:" "Shell:" "WM:" "Terminal:" "Terminal Font:" "CPU:" "GPU:" "Memory:" "Swap:" "Disk" "Locale:" "Local IP" "Battery & Temp")
+
+        echo "$ff_output" | while IFS= read -r line; do
+            matched=0
+            for field in "${GREEN_FIELDS[@]}"; do
+                if [[ $line == $field* ]]; then
+                    field_name="${line%%:*}:"
+                    value="${line#*:}"
+                    # Only field name Bold Green, value stays normal (fastfetch default)
+                    echo -e "${BOLDGREEN}${field_name}${RESET}${value}"
+                    matched=1
+                    break
+                fi
+            done
+            if [[ $matched -eq 0 ]]; then
+                echo "$line"
+            fi
+        done | { [[ $HAS_PV -eq 1 ]] && pv -qL 70 || cat; }
     else
         echo -e "${BOLDGREEN}=== Device Info ===${RESET}"
-        echo -e "Packages: $(command -v dpkg >/dev/null 2>&1 && dpkg -l 2>/dev/null | wc -l || echo N/A)"
+        echo -e "${BOLDGREEN}Packages:${RESET} $(command -v dpkg >/dev/null 2>&1 && dpkg -l 2>/dev/null | wc -l || echo N/A)"
     fi
 }
 
@@ -84,12 +114,12 @@ dashboard_loop() {
             tor_status_text="${RED}TOR OFF${RESET}"
         fi
 
-        [[ $(curl -s --head --max-time 3 https://google.com >/dev/null 2>&1; echo $?) -eq 0 ]] && internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}" || internet_status="${BOLDRED}📴 Internet: OFFLINE DACTIVATED${RESET}"
+        [[ $(curl -s --head --max-time 3 https://google.com >/dev/null 2>&1; echo $?) -eq 0 ]] && internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}" || internet_status="${BOLDRED}📴 Internet: OFFLINE DEACTIVATED${RESET}"
 
         now=$(date "+%Y-%m-%d | %I:%M:%S %p")
         printf "\n\n\n"
 
-        print_neofetch_slow
+        print_fastfetch_slow
         printf "\n"
 
         print_line

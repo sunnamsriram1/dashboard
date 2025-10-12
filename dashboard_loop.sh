@@ -18,8 +18,6 @@ WHITE="\033[1;37m"
 RESET="\033[0m"
 
 COLORS=("$RED" "$GREEN" "$YELLOW" "$CYAN" "$MAGENTA" "$BLUE" "$WHITE")
-
-# ASCII safe line symbols
 LINE_CHARS=("-" "=" "*" "#" "+" "." "~")
 
 HAS_PV=0
@@ -29,7 +27,6 @@ command -v pv >/dev/null 2>&1 && HAS_PV=1
 command -v fastfetch >/dev/null 2>&1 && HAS_FASTFETCH=1
 command -v jq >/dev/null 2>&1 && HAS_JQ=1
 
-# Auto install fastfetch if not installed
 if [[ $HAS_FASTFETCH -eq 0 ]]; then
     echo -e "${BOLDGREEN}Fastfetch not found! Installing...${RESET}"
     pkg install fastfetch -y >/dev/null 2>&1
@@ -64,7 +61,6 @@ print_line() {
 print_fastfetch_slow() {
     if [[ $HAS_FASTFETCH -eq 1 ]]; then
         ff_output=$(fastfetch 2>/dev/null)
-
         GREEN_FIELDS=("OS:" "Host:" "Kernel:" "Uptime:" "Packages:" "Shell:" "WM:" "Terminal:" "Terminal Font:" "CPU:" "GPU:" "Memory:" "Swap:" "Disk" "Locale:" "Local IP" "Battery & Temp")
 
         echo "$ff_output" | while IFS= read -r line; do
@@ -88,8 +84,6 @@ print_fastfetch_slow() {
     fi
 }
 
-# ==== New Helper Functions ====
-
 progress_bar() {
     local value=$1
     local total=100
@@ -102,35 +96,22 @@ progress_bar() {
     printf "%b[%s%s]%b %d%%" "$color" "$(printf '%0.s#' $(seq 1 $filled))" "$(printf '%0.s.' $(seq 1 $empty))" "$RESET" "$value"
 }
 
-get_cpu_usage() {
-    top -bn1 | grep -m1 "CPU" | awk '{print 100-$8}' 2>/dev/null || echo 0
-}
+get_cpu_usage() { top -bn1 | grep -m1 "CPU" | awk '{print 100-$8}' 2>/dev/null || echo 0; }
+get_mem_usage() { free | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' 2>/dev/null || echo 0; }
+get_disk_usage() { df /data/data/com.termux/files/home | awk 'NR==2 {print $5}' | tr -d '%' || echo 0; }
 
-get_mem_usage() {
-    free | awk '/Mem:/ {printf "%.0f", $3/$2 * 100.0}' 2>/dev/null || echo 0
-}
-
-get_disk_usage() {
-    df /data/data/com.termux/files/home | awk 'NR==2 {print $5}' | tr -d '%' || echo 0
-}
-
-
-# ====== Mobile-friendly Net Speed ======
 get_net_speed() {
     local url="https://www.google.com/images/branding/googlelogo/2x/googlelogo_light_color_92x30dp.png"
     local tmpfile=$(mktemp)
-    local start=$(date +%s%3N)   # milliseconds
+    local start=$(date +%s%3N)
     curl -o "$tmpfile" -s --max-time 5 "$url"
     local end=$(date +%s%3N)
     local elapsed_ms=$((end - start))
     [[ $elapsed_ms -eq 0 ]] && elapsed_ms=1
     local size_bytes=$(stat -c%s "$tmpfile" 2>/dev/null || echo 50000)
     rm -f "$tmpfile"
-
     local kbps=$(( size_bytes*1000/elapsed_ms/1024 ))
     local mbps=$(awk "BEGIN {printf \"%.2f\", $kbps/1024*8}")
-
-    # Visual meter
     local bar_len=20
     local speed_percent=$(( kbps > 1024 ? 100 : kbps*100/1024 ))
     local filled=$(( (speed_percent * bar_len)/100 ))
@@ -139,11 +120,8 @@ get_net_speed() {
     [[ $speed_percent -ge 70 ]] && color=$YELLOW
     [[ $speed_percent -ge 90 ]] && color=$RED
     local bar=$(printf "%0.s#" $(seq 1 $filled))$(printf "%0.s." $(seq 1 $empty))
-
     echo "${kbps} KB/s | ${mbps} Mbps [${color}${bar}${RESET}]"
 }
-
-# ==============================
 
 dashboard_loop() {
     sleep 1
@@ -170,20 +148,14 @@ dashboard_loop() {
 
         [[ $(curl -s --head --max-time 3 https://google.com >/dev/null 2>&1; echo $?) -eq 0 ]] && internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}" || internet_status="${BOLDRED}📴 Internet: OFFLINE DEACTIVATED${RESET}"
 
-        #now=$(date "+%Y-%m-%d | %I:%M:%S %p")
-        #!/data/data/com.termux/files/usr/bin/env bash
-        # Example: Current date + day-of-year display
-
-
-
-        # ---- Time + Day-of-Year + Countdown ----
         now=$(date "+%Y-%m-%d | %I:%M:%S %p")
         day_of_year=$(date "+%j")
         day_of_week=$(date "+%A")
 
         CURRENT_YEAR=$(date "+%Y")
         TARGET_DATE="$CURRENT_YEAR-12-31"
-        if [[ $(date -d "$TARGET_DATE" +%s) -lt $(date +%s) ]]; then                                                                                                NEXT_YEAR=$((CURRENT_YEAR + 1))
+        if [[ $(date -d "$TARGET_DATE" +%s) -lt $(date +%s) ]]; then
+            NEXT_YEAR=$((CURRENT_YEAR + 1))
             TARGET_DATE="$NEXT_YEAR-12-31"
         fi
         target_ts=$(date -d "$TARGET_DATE" "+%s")
@@ -195,7 +167,7 @@ dashboard_loop() {
         printf "\n"
         sleep 2
         print_line
-        echo -e "${GREEN}🔴 LIVE DASHBOARD (Press N=New Shell, L=Logs, C=Clear, Q=Quit)${RESET}"
+        echo -e "${GREEN}🔴 LIVE DASHBOARD (Press N=New Shell, L=Logs, C=Clear, T=Stop Tor, Q=Quit)${RESET}"
         print_line
 
         echo -e "👤 User   : ${CYAN}$user_name${RESET} (UID: $user_id)"
@@ -207,11 +179,8 @@ dashboard_loop() {
         echo -e "📌 IP Info : ${CYAN}$ipinfo${RESET}"
         echo -e "🌀 TOR Status: $tor_status_text"
         echo ""
-       # echo -e "⏰ Time: ${YELLOW}$now${RESET} | Day of Year: ${GREEN}$day_of_year${RESET}"
-        #echo -e "⏰ Time: ${YELLOW}$now${RESET}"
         echo -e "⏰ Time: ${YELLOW}$now${RESET} | Day-of-Year: ${CYAN}$day_of_year${RESET} | ${BOLDGREEN}$day_of_week${RESET}"
         echo -e "📅 Countdown to Dec 31: ${BOLDGREEN}$target_days_left days${RESET}"
-        # ==== New Metrics ====
         cpu=$(get_cpu_usage)
         mem=$(get_mem_usage)
         disk=$(get_disk_usage)
@@ -227,7 +196,19 @@ dashboard_loop() {
         read -t 5 -n 1 key 2>/dev/null
         case "$key" in
             [Qq]) clear; exit 0 ;;
-            [Nn]) bash ;; # new shell
+            [Tt])
+                if pgrep -x tor >/dev/null; then
+                    echo -e "\nStopping Tor..."
+                    pkill -TERM tor
+                    sleep 2
+                    pkill -9 tor 2>/dev/null || true
+                    echo -e "✅ Tor stopped."
+                else
+                    echo -e "Tor not running."
+                fi
+                sleep 2
+                ;;
+            [Nn]) bash ;;
             [Ll]) less +G ~/dashboard_logs/*.log 2>/dev/null || echo "No logs yet"; sleep 2 ;;
             [Cc]) rm -rf ~/../usr/tmp/* 2>/dev/null; echo "Cache Cleared!"; sleep 2 ;;
         esac

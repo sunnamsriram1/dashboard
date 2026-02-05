@@ -303,7 +303,7 @@ dashboard_loop() {
 
         echo -e "${MAGENTA}Next Auto-News (${NEWS_INTERVAL}s cycle): ${NEXT_NEWS}s${RESET}"
         print_line
-
+        sleep 4
         if [[ $ELAPSED -ge $NEWS_INTERVAL ]]; then
             fetch_top_news
             LAST_NEWS_TIME=$(date +%s)

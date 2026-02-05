@@ -1,12 +1,11 @@
 
 #!/data/data/com.termux/files/usr/bin/env bash
-# dashboard_loop.sh — Termux dashboard (Battery & Internet Color Fixed)
-# Features: CPU/RAM bars, Disk usage %, Net speed, Interactive menu
+# dashboard_loop.sh — Termux dashboard + Rotating Telugu News (## hash fix)
 
 export LANG=en_US.UTF-8
 TOR_SOCKS_PORT=9050
 
-# Colors
+# Colors (unchanged)
 RED="\033[1;31m"
 GREEN="\033[0;32m"
 BOLDGREEN="\033[1;32m"
@@ -54,7 +53,6 @@ get_tor_status() {
     fi
 }
 
-# --- BATTERY & TEMP FIX (Color Change Logic Added) ---
 get_battery_info() {
     if [[ $HAS_API -eq 1 ]]; then
         local batt_json=$(termux-battery-status 2>/dev/null)
@@ -63,7 +61,6 @@ get_battery_info() {
             local temp=$(echo "$batt_json" | jq -r '.temperature')
             local status=$(echo "$batt_json" | jq -r '.status')
 
-            # Charging Status Color Logic
             local status_color=$RED
             [[ "$status" == "CHARGING" ]] && status_color=$GREEN
 
@@ -152,8 +149,85 @@ get_net_speed() {
     echo "${kbps} KB/s | ${mbps} Mbps [${color}${bar}${RESET}]"
 }
 
+# ─── VOICE + ROTATING NEWS (with ## fix) ───
+VOICE_CMD='termux-tts-speak -e google -l te-IN -p 1.0 -r 1.4'
+say() { $VOICE_CMD "$1" 2>/dev/null || true; }
+
+declare -a NEWS_CATEGORIES=(
+    "World|International News in Telugu"
+    "India|Latest India General News"
+    "APTS|Andhra Pradesh & Telangana Local News"
+    "Tech|Technology & Science News in Telugu"
+    "Edu|Education & Career News"
+    "Crime|Crime News Telugu"
+    "Cinema|Telugu Cinema & Entertainment"
+)
+
+current_category=0
+LAST_NEWS_TIME=$(date +%s)
+NEWS_INTERVAL=300  # 5 mins
+
+get_next_news_query() {
+    local entry="${NEWS_CATEGORIES[$current_category]}"
+    SOURCE="${entry%%|*}"
+    QUERY="${entry#*|}"
+    current_category=$(( (current_category + 1) % ${#NEWS_CATEGORIES[@]} ))
+}
+
+fetch_top_news() {
+    if ! ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+        echo -e "${RED}No internet — skipping news${RESET}"
+        say "ఇంటర్నెట్ లేదు సార్"
+        return
+    fi
+
+    get_next_news_query
+
+    local RSS_URL="https://news.google.com/rss/search?q=${QUERY// /+}&hl=te&gl=IN&ceid=IN:te"
+
+    echo -e "\n${YELLOW}📡 Fetching Top 20 ${SOURCE}...${RESET}"
+    say "సార్, ఇప్పుడు ${SOURCE} టాప్ ఇరవై వార్తలు చదువుతున్నాను. జాగ్రత్తగా వినండి."
+
+    local FULL_DATA
+    FULL_DATA=$(python3 -c '
+import urllib.request
+import xml.etree.ElementTree as ET
+try:
+    req = urllib.request.Request("'"$RSS_URL"'", headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        tree = ET.parse(resp)
+        root = tree.getroot()
+        items = root.findall(".//item")[:20]
+        for i, item in enumerate(items, 1):
+            title = item.find("title").text or ""
+            title = title.lstrip("# ").strip()          # ## లేదా # తీసేయడం + trim
+            if " - " in title:
+                title = title.rsplit(" - ", 1)[0].strip()
+            print(f"{i}###{title}")
+except:
+    print("")
+' 2>/dev/null)
+
+    if [[ -z "$FULL_DATA" ]]; then
+        echo -e "${RED}News fetch failed${RESET}"
+        say "వార్తలు తీసుకోలేకపోయాను సార్"
+        return
+    fi
+
+    echo -e "${CYAN}╭───── ${SOURCE^^} TOP 20 ─────╮${RESET}"
+    while IFS='###' read -r num title; do
+        [[ -z "$title" ]] && continue
+        # Extra safety: remove any remaining # in bash too
+        title=$(echo "$title" | sed 's/^##*//g' | sed 's/^[ \t]*//;s/[ \t]*$//')
+        echo -e "${GREEN}$num.${WHITE} $title${RESET}"
+        say "వార్త సంఖ్య $num. $title"
+        sleep 0.8
+    done <<< "$FULL_DATA"
+    echo -e "${CYAN}╰──────────────────────────────╯${RESET}"
+    say "వార్తలు పూర్తయ్యాయి సార్. తర్వాత కేటగిరీ వార్తలు వస్తాయి."
+}
+
 dashboard_loop() {
-    sleep 1
     while true; do
         clear
         user_name=$(whoami 2>/dev/null || echo "unknown")
@@ -179,7 +253,6 @@ dashboard_loop() {
         if [[ $? -eq 0 ]]; then
              internet_status="${BOLDGREEN}🌐 Internet: ONLINE ACTIVATED${RESET}"
         else
-             # ఇంటర్నెట్ లేనప్పుడు ఇక్కడ రెడ్ కలర్ సెట్ చేశాను
              internet_status="${BOLDRED}📴 Internet: OFFLINE DEACTIVATED${RESET}"
         fi
 
@@ -194,11 +267,16 @@ dashboard_loop() {
         target_days_left=$(( (target_ts - current_ts) / 86400 ))
         [[ $target_days_left -lt 0 ]] && target_days_left=0
 
+        CURRENT_TIME=$(date +%s)
+        ELAPSED=$(( CURRENT_TIME - LAST_NEWS_TIME ))
+        NEXT_NEWS=$(( NEWS_INTERVAL - ELAPSED ))
+        [[ $NEXT_NEWS -lt 0 ]] && NEXT_NEWS=0
+
         printf "\n\n"
         print_fastfetch_slow
         printf "\n"
         print_line
-        echo -e "${GREEN}🔴 LIVE DASHBOARD (Press N=New Shell, L=Logs, C=Clear, T=Stop Tor, Q=Quit)${RESET}"
+        echo -e "${GREEN}🔴 LIVE DASHBOARD (N=New Shell, L=Logs, C=Clear, T=Stop Tor, Q=Quit, R=Force News)${RESET}"
         print_line
 
         echo -e "👤 User   : ${CYAN}$user_name${RESET} (UID: $user_id)"
@@ -223,7 +301,15 @@ dashboard_loop() {
         echo -ne "💾 Disk Usage: "; progress_bar $disk; echo
         echo -e "📡 Net Speed : ${CYAN}$speed${RESET}"
 
+        echo -e "${MAGENTA}Next Auto-News (${NEWS_INTERVAL}s cycle): ${NEXT_NEWS}s${RESET}"
         print_line
+
+        if [[ $ELAPSED -ge $NEWS_INTERVAL ]]; then
+            fetch_top_news
+            LAST_NEWS_TIME=$(date +%s)
+            sleep 2
+            continue
+        fi
 
         read -t 5 -n 1 key 2>/dev/null
         case "$key" in
@@ -242,6 +328,7 @@ dashboard_loop() {
             [Nn]) bash ;;
             [Ll]) less +G ~/dashboard_logs/*.log 2>/dev/null || echo "No logs yet"; sleep 2 ;;
             [Cc]) rm -rf $TMPDIR/* 2>/dev/null; echo "Cache Cleared!"; sleep 2 ;;
+            [Rr]) fetch_top_news; LAST_NEWS_TIME=$(date +%s); sleep 2 ;;
         esac
     done
 }

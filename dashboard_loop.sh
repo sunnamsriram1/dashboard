@@ -158,10 +158,28 @@ declare -a NEWS_CATEGORIES=(
     "India|Latest India General News"
     "APTS|Andhra Pradesh & Telangana Local News"
     "Tech|Technology & Science News in Telugu"
+    "CyberCrime|Cyber Crime News Telugu"
+    "EthicalHacking|Ethical Hacking & Cyber Security Telugu"
+    "Hacking|Hacking News Incidents Telugu"
+    "Spyware|Spyware Pegasus Cyber Attacks News Telugu"
+    "Economy|Economy Budget Inflation News Telugu"
+    "GovtJobs|Government Jobs Notifications in Telugu"
+    "PrivateJobs|Private Jobs & Walkins in Telugu"
+    "Business|Business News & Economy in Telugu"
     "Edu|Education & Career News"
+    "Politics|Politics Andhra Pradesh Telangana News Telugu"
+    "Sports|Sports Cricket Football News in Telugu"
     "Crime|Crime News Telugu"
+    "Health|Health Tips Medicine News Telugu"
+    "Spiritual|Spiritual Hinduism Temples News Telugu"
     "Cinema|Telugu Cinema & Entertainment"
+    "Viral|Viral News & Trending Topics Telugu"
+    "Career|Career Guidance Jobs Education Telugu"
+
 )
+
+
+
 
 current_category=0
 LAST_NEWS_TIME=$(date +%s)
@@ -303,7 +321,7 @@ dashboard_loop() {
 
         echo -e "${MAGENTA}Next Auto-News (${NEWS_INTERVAL}s cycle): ${NEXT_NEWS}s${RESET}"
         print_line
-        sleep 4
+
         if [[ $ELAPSED -ge $NEWS_INTERVAL ]]; then
             fetch_top_news
             LAST_NEWS_TIME=$(date +%s)
